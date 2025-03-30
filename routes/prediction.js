@@ -397,7 +397,58 @@ router.get("/exam-scores", async (req, res) => {
   }
 });
 
+router.get("/predictions/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
 
+    // Validate user ID
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid or missing user ID" 
+      });
+    }
+
+    // Find predictions for the user
+    const predictionDoc = await Prediction.findOne({ 
+      userId: new mongoose.Types.ObjectId(userId) 
+    });
+
+    // If no predictions found, return appropriate response
+    if (!predictionDoc) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "No predictions found for this user" 
+      });
+    }
+
+    // Prepare response with all prediction data
+    const responseData = {
+      success: true,
+      data: {
+        predictions: predictionDoc.predictions || {},
+        certprediction: predictionDoc.certprediction || {},
+        pqprediction_jhs: predictionDoc.pqprediction_jhs || {},
+        prediction_exam_jhs: predictionDoc.prediction_exam_jhs || {},
+        examScores: predictionDoc.examScores || {},
+        overallPrediction: predictionDoc.overallPrediction || [],
+        
+        // Optional: Add timestamp or additional metadata
+        lastUpdated: predictionDoc.updatedAt || new Date()
+      }
+    };
+
+    // Send successful response
+    res.status(200).json(responseData);
+  } catch (error) {
+    console.error("Error fetching predictions:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Server error while fetching predictions",
+      error: error.message 
+    });
+  }
+});
 
 
 module.exports = router;
