@@ -217,44 +217,64 @@ router.post("/save", async (req, res) => {
 
 // Get Top Strands
 router.get("/top-courses", async (req, res) => {
-    try {
-        const allPredictions = await PredictionSHS.find();
+  try {
+      // Fetch only the overall prediction field from the database
+      const allPredictions = await PredictionSHS.find({}, "overallprediction_shs");
 
-        if (!allPredictions.length) {
-            return res.status(404).json({ success: false, message: "No predictions found." });
-        }
+      console.log("Fetched Predictions:", allPredictions); // Debugging
 
-        const courseScores = {};
-        let totalPredictions = 0; // Track total predictions for percentage calculation
+      if (!allPredictions.length) {
+          return res.status(404).json({ success: false, message: "No predictions found." });
+      }
 
-        allPredictions.forEach((prediction) => {
-            Object.entries(prediction.predictions || {}).forEach(([course, data]) => {
-                const percentage = data.percentage || 0; // Get percentage directly
+      const courseScores = {};
+      let totalScore = 0; // Track the total sum of all scores
 
-                if (!courseScores[course]) {
-                    courseScores[course] = { total: 0, count: 0 };
-                }
+      // Process each prediction
+      allPredictions.forEach((prediction) => {
+          console.log("Processing Prediction:", prediction);
 
-                courseScores[course].total += percentage;
-                courseScores[course].count += 1;
-                totalPredictions += 1; // Count total course predictions
-            });
-        });
+          // Ensure the field exists and is an object
+          if (typeof prediction.overallprediction_shs === "object" && prediction.overallprediction_shs !== null) {
+              Object.entries(prediction.overallprediction_shs).forEach(([course, score]) => {
+                  if (!course || typeof score !== "number") return; // Skip invalid data
 
-        const sortedCourses = Object.entries(courseScores)
-            .map(([course, { total, count }]) => ({
-                course,
-                averagePercentage: (total / count).toFixed(2), // Average percentage
-                overallPercentage: ((total / totalPredictions) * 100).toFixed(2) // Percentage relative to total
-            }))
-            .sort((a, b) => b.averagePercentage - a.averagePercentage);
+                  if (!courseScores[course]) {
+                      courseScores[course] = { total: 0, count: 0 };
+                  }
 
-        res.status(200).json({ success: true, data: sortedCourses });
-    } catch (error) {
-        console.error("Error fetching top courses:", error);
-        res.status(500).json({ success: false, message: "Server error", error });
-    }
+                  courseScores[course].total += score;
+                  courseScores[course].count += 1;
+                  totalScore += score;
+              });
+          }
+      });
+
+      console.log("Course Scores:", courseScores); // Debugging
+
+      // Sort courses by overall percentage
+      const sortedCourses = Object.entries(courseScores)
+          .map(([course, { total }]) => ({
+              course,
+              overallPercentage: ((total / (totalScore || 1)) * 100).toFixed(2) // Calculate percentage
+          }))
+          .sort((a, b) => b.overallPercentage - a.overallPercentage);
+
+      console.log("Sorted Courses:", sortedCourses); // Debugging
+
+      res.status(200).json({ success: true, data: sortedCourses });
+
+  } catch (error) {
+      console.error("Error fetching top courses:", error);
+      res.status(500).json({ success: false, message: "Server error", error });
+  }
 });
+
+
+
+
+
+
 
   
 

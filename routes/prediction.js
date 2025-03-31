@@ -276,7 +276,7 @@ router.post("/save", async (req, res) => {
 // Get Top Strands
 router.get("/top-strands", async (req, res) => {
   try {
-    const allPredictions = await Prediction.find();
+    const allPredictions = await Prediction.find({}, "overallPrediction"); // Fetch only overallPrediction
 
     if (!allPredictions.length) {
       return res.status(404).json({ success: false, message: "No predictions found." });
@@ -285,20 +285,20 @@ router.get("/top-strands", async (req, res) => {
     const strandScores = {};
 
     allPredictions.forEach((prediction) => {
-      Object.entries(prediction.predictions || {}).forEach(([strand, data]) => {
-        const strandAvg = data.strand_average || 0;
+      (prediction.overallPrediction || []).forEach(({ strand, score }) => {
         if (!strandScores[strand]) {
           strandScores[strand] = { total: 0, count: 0 };
         }
-        strandScores[strand].total += strandAvg;
+        strandScores[strand].total += parseFloat(score) || 0;
         strandScores[strand].count += 1;
       });
     });
 
+    // Compute averages and sort by highest average score
     const sortedStrands = Object.entries(strandScores)
       .map(([strand, { total, count }]) => ({
         strand,
-        average: total / count,
+        average: count ? total / count : 0, // Avoid division by zero
       }))
       .sort((a, b) => b.average - a.average);
 
@@ -308,6 +308,7 @@ router.get("/top-strands", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error", error });
   }
 });
+
 
 // Get User Predictions
 // router.get("/:userId", async (req, res) => {
